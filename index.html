@@ -917,7 +917,9 @@ function scanLoop(){
   ctx.drawImage(v,0,0,cv.width,cv.height);
   if(window.jsQR){
     const img=ctx.getImageData(0,0,cv.width,cv.height);
-    const code=jsQR(img.data,img.width,img.height,{inversionAttempts:'dontInvert'});
+    // Try all inversion modes for better detection
+    let code=jsQR(img.data,img.width,img.height,{inversionAttempts:'attemptBoth'});
+    if(!code) code=jsQR(img.data,img.width,img.height,{inversionAttempts:'invertFirst'});
     if(code&&code.data.startsWith('CC:')){
       const p=code.data.split(':');
       const num=parseInt(p[1]);const orient=p[2];
@@ -927,7 +929,6 @@ function scanLoop(){
         manualAns(num-1,orient);
         document.getElementById('camStatus').textContent=`✅ #${num} ${clsObj.students[num-1]} → ${orient}`;
       }
-      // Draw green overlay
       const loc=code.location;
       ctx.strokeStyle='#68d391';ctx.lineWidth=4;ctx.beginPath();
       ctx.moveTo(loc.topLeftCorner.x,loc.topLeftCorner.y);
@@ -936,7 +937,13 @@ function scanLoop(){
       ctx.lineTo(loc.bottomLeftCorner.x,loc.bottomLeftCorner.y);
       ctx.closePath();ctx.stroke();
       ctx.fillStyle='#68d391';ctx.font=`bold ${Math.max(16,cv.width/30)}px sans-serif`;
-      ctx.fillText(`#${num} → ${orient}`,loc.topLeftCorner.x+4,loc.topLeftCorner.y-6);
+      ctx.fillText(`#${num}→${orient}`,loc.topLeftCorner.x+4,loc.topLeftCorner.y-6);
+    } else {
+      // Show scanning indicator
+      const t=Date.now()%1000<500;
+      ctx.strokeStyle=t?'#68d391':'#4299e1';ctx.lineWidth=3;
+      const cx=cv.width/2,cy=cv.height/2,sz=120;
+      ctx.strokeRect(cx-sz,cy-sz,sz*2,sz*2);
     }
   }
   requestAnimationFrame(scanLoop);
