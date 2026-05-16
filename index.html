@@ -948,8 +948,25 @@ function scanLoop(){
   }
   requestAnimationFrame(scanLoop);
 }
-// Load jsQR
-(()=>{const sc=document.createElement('script');sc.src='https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js';document.head.appendChild(sc);})();
+// Load jsQR with multiple fallbacks
+function loadJsQR(cb){
+  const urls=[
+    'https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js',
+    'https://unpkg.com/jsqr@1.4.0/dist/jsQR.js',
+    'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js'
+  ];
+  let idx=0;
+  function tryNext(){
+    if(idx>=urls.length){console.error('jsQR no se pudo cargar');return;}
+    const sc=document.createElement('script');
+    sc.src=urls[idx++];
+    sc.onload=()=>{console.log('jsQR cargado desde',sc.src);if(cb)cb();};
+    sc.onerror=()=>{console.warn('Fallo cargando jsQR desde',sc.src);tryNext();};
+    document.head.appendChild(sc);
+  }
+  tryNext();
+}
+loadJsQR();
 
 // ============================================================
 // HISTORY
