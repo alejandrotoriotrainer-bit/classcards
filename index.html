@@ -428,17 +428,21 @@ function initFirebase(){
 function connectFirebase(cfg){
   try{
     if(!firebase.apps.length)firebase.initializeApp(cfg);
+    else firebase.app(); // reuse existing
     db=firebase.database();
     db.ref('.info/connected').on('value',snap=>{
-      document.getElementById('syncDot').className=snap.val()?'ok':'';
+      const dot=document.getElementById('syncDot');
+      if(dot)dot.className=snap.val()?'ok':'';
+      if(snap.val()){
+        subscribeToData();
+        subscribeToLive();
+      }
     });
     document.getElementById('setupScreen').classList.add('hidden');
-    // Load all data from Firebase and subscribe to changes
-    subscribeToData();
-    subscribeToLive();
   }catch(e){
-    document.getElementById('fbError').style.display='block';
-    document.getElementById('fbError').textContent='❌ Error: '+e.message;
+    const errEl=document.getElementById('fbError');
+    if(errEl){errEl.style.display='block';errEl.textContent='❌ Error: '+e.message;}
+    console.error('Firebase error:',e);
   }
 }
 
@@ -493,19 +497,15 @@ function subscribeToData(){
   db.ref('data').on('value',snap=>{
     const val=snap.val();
     if(!val)return;
-    S.classes=val.classes||[];
-    S.exams=val.exams||[];
-    S.sessions=val.sessions||[];
+    if(val.classes)S.classes=val.classes;
+    if(val.exams)S.exams=val.exams;
+    if(val.sessions)S.sessions=val.sessions;
     LS.save();
-    // Refresh current view
     renderClasses();
     renderExamGrid();
-    if(document.getElementById('sec-session').classList.contains('active')){
-      updateSessSelects();renderManualGrid();
-    }
-    if(document.getElementById('sec-history').classList.contains('active')){
-      updateHistSelect();renderHistory();
-    }
+    updateSessSelects();
+    updateHistSelect();
+    if(document.getElementById('sec-history').classList.contains('active'))renderHistory();
     if(S.editingExamId)renderQEditorList();
   });
 }
