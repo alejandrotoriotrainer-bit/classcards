@@ -429,11 +429,12 @@ function connectFirebase(cfg){
   try{
     if(!firebase.apps.length)firebase.initializeApp(cfg);
     db=firebase.database();
-    // Test connection
     db.ref('.info/connected').on('value',snap=>{
       document.getElementById('syncDot').className=snap.val()?'ok':'';
     });
     document.getElementById('setupScreen').classList.add('hidden');
+    // Load all data from Firebase and subscribe to changes
+    subscribeToData();
     subscribeToLive();
   }catch(e){
     document.getElementById('fbError').style.display='block';
@@ -458,8 +459,20 @@ window.addEventListener('load',()=>{
 });
 
 // ============================================================
-// REALTIME SYNC (Firebase)
+// REALTIME SYNC (Firebase) — clases, exámenes, sesiones y scans
 // ============================================================
+
+// Push everything to Firebase
+function pushAll(){
+  if(!db)return;
+  db.ref('data').set({
+    classes:S.classes,
+    exams:S.exams,
+    sessions:S.sessions,
+    ts:Date.now()
+  });
+}
+
 function pushScans(){
   if(!db)return;
   const sessClass=document.getElementById('sessClass')?.value;
@@ -474,14 +487,35 @@ function pushScans(){
   });
 }
 
+// Subscribe to classes/exams/sessions changes from any device
+function subscribeToData(){
+  if(!db)return;
+  db.ref('data').on('value',snap=>{
+    const val=snap.val();
+    if(!val)return;
+    S.classes=val.classes||[];
+    S.exams=val.exams||[];
+    S.sessions=val.sessions||[];
+    LS.save();
+    // Refresh current view
+    renderClasses();
+    renderExamGrid();
+    if(document.getElementById('sec-session').classList.contains('active')){
+      updateSessSelects();renderManualGrid();
+    }
+    if(document.getElementById('sec-history').classList.contains('active')){
+      updateHistSelect();renderHistory();
+    }
+    if(S.editingExamId)renderQEditorList();
+  });
+}
+
 function subscribeToLive(){
   if(!db)return;
   db.ref('live/scans').on('value',snap=>{
     const val=snap.val();
     if(!val)return;
-    // Update scans from any device
     S.currentScans=val.scans||{};
-    // Sync question index on projector/tablet
     if(S.sessQIdx!==val.qIdx){
       S.sessQIdx=val.qIdx||0;
       renderSessQ();
@@ -518,7 +552,8 @@ function addClass(){
   if(!name||!bulk)return alert('Rellena nombre y alumnos');
   const students=bulk.split('\n').map(s=>s.trim()).filter(Boolean);
   S.classes.push({id:Date.now(),name,students});
-  LS.save();document.getElementById('className').value='';document.getElementById('studentBulk').value='';
+  LS.save();pushAll();
+  document.getElementById('className').value='';document.getElementById('studentBulk').value='';
   renderClasses();
 }
 function renderClasses(){
@@ -533,7 +568,7 @@ function renderClasses(){
       <div style="margin-top:7px">${c.students.map((s,j)=>`<span class="tag">${j+1}. ${s}</span>`).join('')}</div>
     </div>`).join('');
 }
-function delClass(i){if(confirm('¿Eliminar?')){S.classes.splice(i,1);LS.save();renderClasses();}}
+function delClass(i){if(confirm('¿Eliminar?')){S.classes.splice(i,1);LS.save();pushAll();renderClasses();}}
 
 // ============================================================
 // EXAM LIBRARY
